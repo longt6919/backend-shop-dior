@@ -1,0 +1,66 @@
+spring.application.name=shop-dior
+
+# Multipart
+spring.servlet.multipart.enabled=true
+spring.servlet.multipart.max-file-size=10MB
+spring.servlet.multipart.max-request-size=10MB
+
+# Database
+spring.datasource.url=${SPRING_DATASOURCE_URL}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD}
+spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+# JPA / Hibernate
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.SQLServer2012Dialect
+spring.jpa.database-platform=org.hibernate.dialect.SQLServerDialect
+
+# Debug
+debug=true
+logging.level.org.springframework.web=DEBUG
+logging.level.org.springframework.http.converter.json=DEBUG
+logging.level.org.springframework.security=DEBUG
+
+# Profiles
+spring.profiles.active=dev
+
+# JWT
+jwt.expiration=${JWT_EXPIRATION:2592000}
+jwt.secretKey=${JWT_SECRET}
+
+# i18n
+spring.messages.basename=i18n/messages
+spring.messages.encoding=UTF-8
+spring.messages.default-locale=vi
+
+# Google OAuth
+spring.security.oauth2.client.registration.google.client-id=${GOOGLE_CLIENT_ID}
+spring.security.oauth2.client.registration.google.client-secret=${GOOGLE_CLIENT_SECRET}
+spring.security.oauth2.client.registration.google.scope=openid,profile,email
+spring.security.oauth2.client.registration.google.redirect-uri=${GOOGLE_REDIRECT_URI:http://localhost:4200/auth/google/callback}
+spring.security.oauth2.client.registration.google.client-name=Google
+spring.security.oauth2.client.provider.google.authorization-uri=https://accounts.google.com/o/oauth2/v2/auth
+spring.security.oauth2.client.provider.google.token-uri=https://oauth2.googleapis.com/token
+spring.security.oauth2.client.provider.google.user-info-uri=https://www.googleapis.com/oauth2/v3/userinfo
+spring.security.oauth2.client.provider.google.user-name-attribute=sub
+
+# Facebook OAuth
+spring.security.oauth2.client.registration.facebook.client-id=${FACEBOOK_CLIENT_ID}
+spring.security.oauth2.client.registration.facebook.client-secret=${FACEBOOK_CLIENT_SECRET}
+spring.security.oauth2.client.registration.facebook.redirect-uri=${FACEBOOK_REDIRECT_URI:http://localhost:4200/auth/facebook/callback}
+spring.security.oauth2.client.registration.facebook.authorization-grant-type=authorization_code
+spring.security.oauth2.client.registration.facebook.scope=email,public_profile
+spring.security.oauth2.client.provider.facebook.authorization-uri=https://www.facebook.com/v23.0/dialog/oauth
+spring.security.oauth2.client.provider.facebook.token-uri=https://graph.facebook.com/v10.0/oauth/access_token
+spring.security.oauth2.client.provider.facebook.user-info-uri=https://graph.facebook.com/me?fields=id,name,email
+spring.security.oauth2.client.provider.facebook.user-name-attribute=id
+
+# VNPAY
+vnpay.pay-url=${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+vnpay.return-url=${VNPAY_RETURN_URI:http://localhost:4200/payments/payment-callback}
+vnpay.tmn-code=${VNPAY_TMN_CODE}
+vnpay.secret-key=${VNPAY_SECRET_KEY}
+vnpay.api-url=${VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
