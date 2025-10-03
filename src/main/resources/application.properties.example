@@ -24,6 +24,10 @@ logging.level.org.springframework.web=DEBUG
 logging.level.org.springframework.http.converter.json=DEBUG
 logging.level.org.springframework.security=DEBUG
 
+spring.data.redis.host=${REDIS_HOST:localhost}
+spring.data.redis.port=${REDIS_PORT:6379}
+spring.data.cache.type=redis
+
 # Profiles
 spring.profiles.active=dev
 
