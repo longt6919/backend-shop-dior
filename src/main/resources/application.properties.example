@@ -27,6 +27,8 @@ logging.level.org.springframework.security=DEBUG
 spring.data.redis.host=${REDIS_HOST:localhost}
 spring.data.redis.port=${REDIS_PORT:6379}
 spring.data.cache.type=redis
+spring.data.redis.use-redis-cache=true
+
 
 # Profiles
 spring.profiles.active=dev

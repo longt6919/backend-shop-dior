@@ -50,6 +50,7 @@ public class ProductResponse extends ResponseBaseEntity{
     private List<ProductImage> productImages = new ArrayList<>();
     @JsonProperty("product_details")
     private List<ProductDetailDTO> productDetails;
+    private int totalPages;
     public static ProductResponse fromProduct(Product product,List<ProductDetailDTO> detils){
         ProductResponse productResponse = ProductResponse.builder()
                 .id(product.getId())

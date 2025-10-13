@@ -1,5 +1,6 @@
 package com.project.shop_dior.controllers;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.project.shop_dior.component.LocalizationUtils;
 import com.project.shop_dior.dtos.ProductDTO;
 import com.project.shop_dior.dtos.ProductDetailDTO;
@@ -12,11 +13,14 @@ import com.project.shop_dior.responses.ProductListResponse;
 import com.project.shop_dior.responses.ProductResponse;
 import com.project.shop_dior.responses.ResponseObject;
 import com.project.shop_dior.service.ProductDetailService;
+import com.project.shop_dior.service.ProductRedisService;
 import com.project.shop_dior.service.ProductService;
 import com.project.shop_dior.utils.FileUtils;
 import com.project.shop_dior.utils.MessageKeys;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,36 +44,59 @@ import java.util.stream.Collectors;
 @Validated
 @RequiredArgsConstructor
 public class ProductController {
+    private static final Logger logger = LoggerFactory.getLogger(ProductController.class);
     private final ProductService productService;
     private final ProductDetailService productDetailService;
+    private final ProductRedisService productRedisService;
     private final LocalizationUtils localizationUtils;
     @GetMapping("/home/admin")
     public ResponseEntity<ProductListResponse> getAllProductsAdmin(
             @RequestParam(defaultValue = "") String keyword,
-            @RequestParam(defaultValue = "0",name = "category_id") Long categoryId,
-            @RequestParam(defaultValue = "0",name = "brand_id") Long brandId,
-            @RequestParam(defaultValue = "0",name = "origin_id") Long originId,
-            @RequestParam(defaultValue = "0",name = "style_id") Long styleId,
-            @RequestParam(defaultValue = "0",name = "material_id") Long materialId,
+            @RequestParam(defaultValue = "0", name = "category_id") Long categoryId,
+            @RequestParam(defaultValue = "0", name = "brand_id") Long brandId,
+            @RequestParam(defaultValue = "0", name = "origin_id") Long originId,
+            @RequestParam(defaultValue = "0", name = "style_id") Long styleId,
+            @RequestParam(defaultValue = "0", name = "material_id") Long materialId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "16") int limit
-    ) {
-        if (categoryId != null && categoryId == 0) {
-            categoryId = null;
+            @RequestParam(defaultValue = "12") int limit
+    ) throws JsonProcessingException {
+
+        int totalPages = 0;
+        PageRequest pageRequest = PageRequest.of(page, limit, Sort.by("id").ascending());
+
+        // Ghi log tham số
+        logger.info("getAllProductsAdmin: keyword={}, category={}, brand={}, origin={}, page={}, limit={}",
+                keyword, categoryId, brandId, originId, page, limit);
+
+        // ✅ 1) Kiểm tra cache
+        List<ProductResponse> productResponses = productRedisService.getAllProducts(
+                keyword, categoryId, originId, brandId, styleId, materialId, pageRequest);
+
+        if (productResponses != null) {
+            logger.info("✅ [CACHE HIT] Dữ liệu lấy từ Redis cache");
+            if (!productResponses.isEmpty()) totalPages = productResponses.get(0).getTotalPages();
+        } else {
+            logger.warn("❌ [CACHE MISS] Không có trong cache, đang truy vấn DB...");
+            // 2) Query DB
+            Page<ProductResponse> productPage = productService.getAllProductsAdmin(
+                    keyword, categoryId, brandId, originId, styleId, materialId, pageRequest);
+            totalPages = productPage.getTotalPages();
+            productResponses = productPage.getContent();
+
+            for (ProductResponse product : productResponses) {
+                product.setTotalPages(totalPages);
+            }
+            // 3) Save cache
+            productRedisService.saveAllProducts(
+                    productResponses, keyword, categoryId, originId, brandId, styleId, materialId, pageRequest);
+            logger.info("💾 [CACHE SAVE] Đã lưu {} sản phẩm vào Redis", productResponses.size());
         }
-        PageRequest pageRequest = PageRequest.of(
-                page, limit, Sort.by("id").ascending());
-        Page<ProductResponse> productPage = productService.getAllProductsAdmin(keyword,
-                categoryId,brandId,originId,styleId,materialId,pageRequest);
-        //lấy tổng số trang
-        int totalPages = productPage.getTotalPages();
-        List<ProductResponse> products = productPage.getContent();
-        return ResponseEntity.ok(ProductListResponse
-                .builder()
-                .products(products)
+        return ResponseEntity.ok(ProductListResponse.builder()
+                .products(productResponses)
                 .totalPages(totalPages)
                 .build());
     }
+
     @GetMapping("")
     public ResponseEntity<ProductListResponse> getAllProductsByActive(
             @RequestParam(defaultValue = "") String keyword,
@@ -79,19 +106,40 @@ public class ProductController {
             @RequestParam(defaultValue = "0",name = "style_id") Long styleId,
             @RequestParam(defaultValue = "0",name = "material_id") Long materialId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "16") int limit
-    ) {
+            @RequestParam(defaultValue = "12") int limit
+    )throws JsonProcessingException {
 
-        PageRequest pageRequest = PageRequest.of(
-                page, limit, Sort.by("id").ascending());
-        Page<ProductResponse> productPage = productService.getAllProductsByActive(keyword,
-                originId,categoryId,brandId,styleId,materialId,pageRequest);
-        //lấy tổng số trang
-        int totalPages = productPage.getTotalPages();
-        List<ProductResponse> products = productPage.getContent();
-        return ResponseEntity.ok(ProductListResponse
-                .builder()
-                .products(products)
+        int totalPages = 0;
+        PageRequest pageRequest = PageRequest.of(page, limit, Sort.by("id").ascending());
+
+        // Ghi log tham số
+        logger.info("getAllProductsAdmin: keyword={}, category={}, brand={}, origin={}, page={}, limit={}",
+                keyword, categoryId, brandId, originId, page, limit);
+
+        // 1) Kiểm tra cache
+        List<ProductResponse> productResponses = productRedisService.getAllProductsByActive(
+                keyword, categoryId, originId, brandId, styleId, materialId, pageRequest);
+
+        if (productResponses != null) {
+            logger.info("✅ [CACHE HIT] Dữ liệu lấy từ Redis cache");
+            if (!productResponses.isEmpty()) totalPages = productResponses.get(0).getTotalPages();
+        } else {
+            logger.warn("❌ [CACHE MISS] Không có trong cache, đang truy vấn DB...");
+            // 2) Query DB
+            Page<ProductResponse> productPage = productService.getAllProductsByActive(
+                    keyword, categoryId, brandId, originId, styleId, materialId, pageRequest);
+            totalPages = productPage.getTotalPages();
+            productResponses = productPage.getContent();
+            for (ProductResponse product : productResponses) {
+                product.setTotalPages(totalPages);
+            }
+            // 3) Save cache
+            productRedisService.saveAllProducts(
+                    productResponses, keyword, categoryId, originId, brandId, styleId, materialId, pageRequest);
+            logger.info("💾 [CACHE SAVE] Đã lưu {} sản phẩm vào Redis", productResponses.size());
+        }
+        return ResponseEntity.ok(ProductListResponse.builder()
+                .products(productResponses)
                 .totalPages(totalPages)
                 .build());
     }
@@ -204,17 +252,14 @@ public class ProductController {
         try {
             // 1) Lấy product
             Product product = productService.getProductById(productId);
-
             // 2) Lấy list detail còn hàng và map sang DTO
             List<ProductDetailDTO> details = productDetailService
                     .getAvailableDetails(productId)  // chỉ quantity > 0
                     .stream()
                     .map(ProductDetailDTO::fromEntity)
                     .toList();
-
             // 3) Build ProductResponse đã có factory nhận thêm details
             ProductResponse resp = ProductResponse.fromProduct(product, details);
-
             // 4) Trả về
             return ResponseEntity.ok(resp);
 

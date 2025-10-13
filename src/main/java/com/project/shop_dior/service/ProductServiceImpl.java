@@ -5,15 +5,19 @@ import com.project.shop_dior.dtos.ProductDetailDTO;
 import com.project.shop_dior.dtos.ProductImageDTO;
 import com.project.shop_dior.exception.DataNotFoundException;
 import com.project.shop_dior.exception.InvalidParamException;
+import com.project.shop_dior.listeners.ProductChangedEvent;
 import com.project.shop_dior.models.*;
 import com.project.shop_dior.repository.*;
 import com.project.shop_dior.responses.ProductResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -35,6 +39,7 @@ public class ProductServiceImpl  implements ProductService{
     private final ColorRepository colorRepository;
     private final ProductImageRepository productImageRepository;
     private final ProductDetailService productDetailService;
+    private final ApplicationEventPublisher publisher;
 
     @Override
     @Transactional
@@ -60,7 +65,6 @@ public class ProductServiceImpl  implements ProductService{
         if (productDTO.getName() == null || productDTO.getName().isBlank()) {
             throw new IllegalArgumentException("Tên sản phẩm không được để trống");
         }
-
         // 2. Tạo và lưu Product chính
         Product newProduct = Product.builder()
                 .name(productDTO.getName())
@@ -73,11 +77,11 @@ public class ProductServiceImpl  implements ProductService{
                 .material(existingMaterial)
                 .brand(existingBrand)
                 .build();
-        productRepository.save(newProduct);
+        Product saved = productRepository.save(newProduct);
+        publisher.publishEvent(new ProductChangedEvent(saved.getId()));
 // 3. Sinh tự động full size × full color
         List<Size> allSizes = sizeRepository.findAll();
         List<Color> allColors = colorRepository.findAll();
-
         List<ProductDetail> details = new ArrayList<>();
         for (Size sz : allSizes) {
             for (Color col : allColors) {
@@ -90,7 +94,7 @@ public class ProductServiceImpl  implements ProductService{
                 details.add(pd);
             }
         }
-        productDetailRepository.saveAll(details);
+
         // 4. Trả về đối tượng đã lưu, có đầy đủ ID
         return newProduct;
     }
@@ -98,42 +102,43 @@ public class ProductServiceImpl  implements ProductService{
 
     @Override
     public Product getProductById(long id) throws Exception {
-        return productRepository.findById(id).orElseThrow(() ->new DataNotFoundException("Không tìm thấy sản phẩm id ="+ id));
+        return productRepository.findById(id).orElseThrow(()
+                ->new DataNotFoundException("Không tìm thấy sản phẩm id ="+ id));
     }
 
-    @Override
-    public Page<ProductResponse> getAllProducts(String keyword, Long categoryId,
-           Long originId, Long brandId, Long styleId, Long materialId, PageRequest pageRequest) {
-        Page<Product> products = productRepository.searchProducts(brandId,categoryId,originId,styleId,materialId,keyword,pageRequest);
-        return products.map(product -> {
-            // 1) Lấy luôn detail có quantity>0
-            List<ProductDetailDTO> detailDTOs = productDetailService
-                    .getAvailableDetails(product.getId())           // trả về chỉ quantity>0
-                    .stream()
-                    .map(ProductDetailDTO::fromEntity)
-                    .toList();                                      // hoặc .collect(Collectors.toList())
-            // 2) Map Product + detailDTOs vào response
-            return ProductResponse.builder()
-                    .id(product.getId())
-                    .name(product.getName())
-                    .price(product.getPrice())
-                    .thumbnail(product.getThumbnail())
-                    .description(product.getDescription())
-                    .categoryId(product.getCategory().getId())
-                    .originId(product.getOrigin().getId())
-                    .brandId(product.getBrand().getId())
-                    .styleId(product.getStyle().getId())
-                    .materialId(product.getMaterial().getId())
-                    .productImages(product.getProductImages())
-                    .active(product.isActive())
-                    .createAt(product.getCreateAt())
-                    .updateAt(product.getUpdateAt())
-                        // <-- Không cần khai báo lại, cứ gọi builder bình thường
-                    // … map thêm các trường khác tuỳ ProductResponse …
-                    .productDetails(detailDTOs)
-                    .build();
-        });
-    }
+//    @Override
+//    public Page<ProductResponse> getAllProducts(String keyword, Long categoryId,
+//           Long originId, Long brandId, Long styleId, Long materialId, PageRequest pageRequest) {
+//        Page<Product> products = productRepository.searchProducts(brandId,categoryId,originId,styleId,materialId,keyword,pageRequest);
+//        return products.map(product -> {
+//            // 1) Lấy luôn detail có quantity>0
+//            List<ProductDetailDTO> detailDTOs = productDetailService
+//                    .getAvailableDetails(product.getId())           // trả về chỉ quantity>0
+//                    .stream()
+//                    .map(ProductDetailDTO::fromEntity)
+//                    .toList();                                      // hoặc .collect(Collectors.toList())
+//            // 2) Map Product + detailDTOs vào response
+//            return ProductResponse.builder()
+//                    .id(product.getId())
+//                    .name(product.getName())
+//                    .price(product.getPrice())
+//                    .thumbnail(product.getThumbnail())
+//                    .description(product.getDescription())
+//                    .categoryId(product.getCategory().getId())
+//                    .originId(product.getOrigin().getId())
+//                    .brandId(product.getBrand().getId())
+//                    .styleId(product.getStyle().getId())
+//                    .materialId(product.getMaterial().getId())
+//                    .productImages(product.getProductImages())
+//                    .active(product.isActive())
+//                    .createAt(product.getCreateAt())
+//                    .updateAt(product.getUpdateAt())
+//                        // <-- Không cần khai báo lại, cứ gọi builder bình thường
+//                    // … map thêm các trường khác tuỳ ProductResponse …
+//                    .productDetails(detailDTOs)
+//                    .build();
+//        });
+//    }
 
     @Override
     public Page<ProductResponse> getAllProductsAdmin(String keyword, Long categoryId,
@@ -181,7 +186,6 @@ public class ProductServiceImpl  implements ProductService{
                     .stream()
                     .map(ProductDetailDTO::fromEntity)
                     .toList();                                      // hoặc .collect(Collectors.toList())
-
             // 2) Map Product + detailDTOs vào response
             return ProductResponse.builder()
                     .id(product.getId())
@@ -252,7 +256,9 @@ public class ProductServiceImpl  implements ProductService{
             //  Chỉ update thumbnail nếu được truyền từ frontend
             if (productDTO.getThumbnail() != null && !productDTO.getThumbnail().isEmpty()) {
                 existingProduct.setThumbnail(productDTO.getThumbnail());
-            }            return productRepository.save(existingProduct);
+            }  Product saved = productRepository.save(existingProduct);
+            publisher.publishEvent(new ProductChangedEvent(saved.getId()));
+            return saved;
         }
         return null;
     }
@@ -428,8 +434,7 @@ public class ProductServiceImpl  implements ProductService{
         Product existingProduct = productRepository.findById(productId)
                 .orElseThrow(()-> new DataNotFoundException("Product not found"));
         existingProduct.setActive(active);
-        productRepository.save(existingProduct);
+        Product saved = productRepository.save(existingProduct);
+        publisher.publishEvent(new ProductChangedEvent(saved.getId()));
     }
-
-
 }

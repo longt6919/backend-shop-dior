@@ -48,13 +48,11 @@ public class OrderResponse {
     private String paymentMethod;
     @JsonProperty("order_details")
     private List<OrderDetailResponse> orderDetails;
-
     public static OrderResponse fromOrder(Order order) {
         List<OrderDetailResponse> detailResponses = order.getOrderDetails()
                 .stream()
                 .map(OrderDetailResponse::fromOrderDetail)
                 .collect(Collectors.toList());
-
         return OrderResponse.builder()
                 .id(order.getId())
                 .userId(order.getUser().getId())

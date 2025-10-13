@@ -21,9 +21,6 @@ public interface ProductService {
     // Lấy thông tin chi tiết sản phẩm theo ID
     Product getProductById(long id) throws Exception;
 
-    // Lấy danh sách sản phẩm có tìm kiếm và lọc theo category, phân trang
-    Page<ProductResponse> getAllProducts(String keyword, Long categoryId, Long originId,
-                               Long brandId ,Long styleId ,Long materialId, PageRequest pageRequest);
     // Lấy danh sách sản phẩm có tìm kiếm và lọc theo category, phân trang, all detail
     Page<ProductResponse> getAllProductsAdmin(String keyword, Long categoryId,
                                               Long originId, Long brandId, Long styleId, Long materialId, PageRequest pageRequest);
